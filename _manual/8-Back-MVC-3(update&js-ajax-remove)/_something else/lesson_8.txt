@@ -1,0 +1,195 @@
+----8-Back-MVC-3(update&js-ajax-remove)
+
+--- UPDATE
+
+--- Контроллер ресурсов RESTful
+Verb    Path                        Action  Route Name
+GET     /users                      index   users.index
+GET     /users/create               create  users.create
+POST    /users                      store   users.store
+GET     /users/{user}               show    users.show
+GET     /users/{user}/edit          edit    users.edit
+PUT     /users/{user}               update  users.update
+PUT     /comments/{comment}         update  comments.update
+DELETE  /users/{user}               destroy users.destroy
+Verb    Path                        Action  Route Name
+GET     /users/{user}/edit          edit    users.edit
+PUT     /users/{user}               update  users.update
+
+@extends('back.messages.template')
+
+@section('form-open')
+    <form method="post" action="{{ route('messages.update', [$message->id]) }}">
+                     {{ csrf_field() }}
+                  {{ method_field('PUT') }}   
+@endsection
+
+...Controllers\Back\AdminController.php from laravel-cards
+
+    /**
+     * Update the specified resource in storage.
+     *
+     * @param  \App\Http\Requests\ApimessageRequest $request
+     * @param  \App\Models\Apimessage $message
+     * @return \Illuminate\Http\Response
+     */
+    //public function update(ApimessageRequest $request, Apimessage $message)
+    public function update(Request $request, Apimessage $message)
+    {
+        //$this->authorize('manage', $card);
+
+        $this->repository->update($request, $message);
+
+        return redirect(route('dashboard'))->with('message-updated', __('The message has been successfully updated'));
+     } 
+
+
+...Repositories\AdminRepository.php from laravel-lessoncards
+
+    /**
+     * Update message.
+     *
+     * @param  \App\Models\Apimessage $message
+     * @return void
+     */
+    public function update($request, $message)
+    {
+        //$card->update($request->all());
+        $message->title = $request->title;
+        $message->message = $request->message;
+        $message->save();        
+    }        
+
+
+...views\back\index.blade.php
+
+                      @if (session('message-updated'))
+                          @component('back.components.alert')
+                              @slot('type')
+                                  success
+                              @endslot
+                              {!! session('message-updated') !!}
+                          @endcomponent
+                      @endif
+
+...Requests\ApimessageRequest.php to ...Requests\MessageRequest.php - !here
+
++ ...Requests\MessageRequest.php
+
+namespace App\Http\Requests;
+
+class MessageRequest extends Request
+{
+
+    /**
+     * Get the validation rules that apply to the request.
+     *
+     * @return array
+     */
+    public function rules()
+    {
+        return $rules = [
+            'title' => 'bail|required|max:255',
+            'message' => 'bail|required|max:500',   
+        ];
+    }
+
++ ...Controllers\Back\AdminController.php
+
+use App\ {
+    Http\Controllers\Controller,  //without «,» for end
+    Repositories\AdminRepository,
+    Http\Requests\MessageRequest,    
+    Http\Controllers\Traits\Indexable,
+    Models\Apimessage
+
+};
+
++ here
+
+    public function update(MessageRequest $request, Apimessage $message)
+    //public function update(Request $request, Apimessage $message)
+…
+
+--- ???
+
+...if you want to use mass assignable + create
+
+                    <div class="box-body">
+
+                        <input type="hidden" name="user_id" value="{{$message->user_id}}" />
+                        <input type="hidden" name="datevisit" value="{{$message->datevisit}}" />
+
+...then ...Repositories\AdminRepository.php
+
+    public function update($request, $message)
+    {
+        $message->update($request->all());
+        //$message->title = $request->title;
+        //$message->message = $request->message;
+        //$message->save();        
+    }    
+
+
+Verb    Path                        Action  Route Name
+DELETE  /users/{user}               destroy users.destroy
+
+--- DESTROY
+
+...views\back\brick-standart.blade.php
+
+<td class="center widthbutton"><a class="btn btn-danger listbuttonremove" href="{{ route('messages.destroy', [$message->id]) }}"><i class="fa fa-trash-o" aria-hidden="true"></i></a></td>
+
+...views\back\index.blade.php - !here
+
+@section('js')
+    <script src="{{ asset('public/js/mine.js') }}"></script>
+    <script>
+       $(document).ready(function(){
+          $('#user_id').change(function(){
+             BaseRecord.userSelect(this.value, url, errorAjax); 
+          });
+      
+          $(".listbuttonremove").click(function(){
+             BaseRecord.destroy($(this).attr('href'));
+             return false;
+          }); 
+
+       })   
+    </script>
+@endsection    
+
+
+public\js\mine.js
+
+destroy: function(url){
+   var ajaxSetting={
+      method: 'delete',
+      url: url,
+      //data: {
+      //   type: type_id, 
+      //},
+      success: function(data) {
+         //alert(data);
+         BaseRecord.userSelect(0, '/dashboard');
+      },
+   };
+   $.ajax(ajaxSetting);
+},
+
+
+AdminController.php
+
+    /**
+     * Remove the card from storage.
+     *
+     * @param  \App\Models\Apimessage $message
+     * @return \Illuminate\Http\Response
+     */
+    public function destroy(Apimessage $message){
+       //$this->authorize('manage', $card); 
+       $message->delete();
+
+       return response()->json();    
+    }      
+

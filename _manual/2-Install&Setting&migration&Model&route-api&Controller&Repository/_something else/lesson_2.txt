@@ -1,0 +1,162 @@
+----- 2-migrations&Model&route-api&Controller&Repository (SOMETIMES BY YOURSELF, WITHOUT START-FILES, COPY-PASTE FROM LAST PROJECT AND CHANGE)
+
+database\migrations\2019_02_02_082606_apimessages.php
+
+            $table->increments('id');
+            $table->string('title');
+            $table->string('message');
+            $table->date('datevisit')->nullable();  
+
+php artisan migrate
+
+---
+
+Create app\Models + rename Model.php there
+
+User.php - namespace App\Models; 
+
+config/auth.php 
+   'providers' => [
+        'users' => [
+            'driver' => 'eloquent',
+            'model' => App\Models\User::class,
+        ],
+
+app\Http\Controllers\Auth\RegisterController.php
+use App\Models\User;
+
++ app\Models\Apimessage.php
+
+    public $timestamps = false;
+
+    /**
+     * The attributes that are mass assignable.
+     *
+     * @var array
+     */
+
+    protected $fillable = [
+         'title', 'message', 'datevisit',
+    ];
+
+(
+curl -s http://getcomposer.org/installer | php
+sudo mv composer.phar /usr/local/bin/
+alias composer='/usr/local/bin/composer.phar'
+)
+
+composer dump-autoload
+php artisan config:cache
+sudo chmod -R 777 storage
+
+---
+
+routes/api.php
+
+//Route::name('apimessages')->middleware('auth:api')->resource('apimessages', 'Back\ApiController'); 
+
+Route::name('apimessages')->resource('apimessages', 'Back\ApiController'); 
+
+---
+
+app\Http\Controllers\Back\ApiController.php (FROM laravel-cards (or laravel-auto-group1) AdminController.php AND CHANGE)
+(
+Контроллер ресурсов RESTful
+Verb    Path                        Action  Route Name
+GET     /users                      index   users.index
+GET     /users/create               create  users.create
+POST    /users                      store   users.store
+GET     /users/{user}               show    users.show
+GET     /users/{user}/edit          edit    users.edit
+PUT     /users/{user}               update  users.update
+PUT     /comments/{comment}         update  comments.update
+DELETE  /users/{user}               destroy users.destroy
+)
+
+namespace App\Http\Controllers\Back;
+
+use Illuminate\Http\Request;
+use App\ {
+   Http\Controllers\Controller,
+   Repositories\AdminRepository
+   //Http\Requests\ApiRequest
+
+};
+
+class ApiController extends Controller
+{
+
+    protected $repository;
+
+    /**
+     * Create a new controller instance.
+     *
+     * @return void
+     */
+    public function __construct(AdminRepository $repository)
+    {
+        //$this->middleware('auth');
+        $this->repository = $repository;
+    }
+
+    /**
+     * Store a newly created auto in storage.
+     *
+     * @param  \App\Http\Requests\ApiRequest $request
+     * @return \Illuminate\Http\Response
+     */
+    public function store(Request $request)
+    {
+       return $this->repository->storeapimessages($request); 
+       //return redirect(route('dashboard'))->with('auto-ok', 'New auto has been successlully created...');
+    }    
+
+}
+
+app\Repositories\AdminRepository.php (FROM laravel-cards AdminRepository.php AND CHANGE)
+
+amespace App\Repositories;
+
+use App\Models\ {
+    Apimessage
+};
+
+class AdminRepository
+{
+    /**
+     * The Model instance.
+     *
+     * @var \Illuminate\Database\Eloquent\Model
+     */
+    protected $model;
+
+
+    /**
+     * Create a new AdminRepository instance
+     *
+     * @param  \App\Models\Apimessage $apimessage
+     */
+    public function __construct(Apimessage $apimessage) 
+    {
+        $this->model = $apimessage;
+    }
+
+    /**
+     * Store a newly created apimessage in storage.
+     *
+     * @param  \App\Http\Requests\ApiRequest $request
+     * @return \Illuminate\Http\Response
+     */
+    public function storeapimessages($request)
+    {
+       return Apimessage::create($request->all());
+    } 
+
+}
+
+---
+mobi-message\Api.php
+
+...
+$response = $client->request('POST', 'http://laravel-message/api/apimessages', [  //!!!POST - only store
+...

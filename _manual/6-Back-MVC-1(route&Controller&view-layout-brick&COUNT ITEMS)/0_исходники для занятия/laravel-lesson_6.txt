@@ -1,0 +1,220 @@
+---- 6-Back-MVC-1(login&registration&route&Controller&view-layout-brick&COUNT OF MESSAGES)
+
+--- views\front\auth\login.blade.php & register.blade.php from laravel-cards
+
+!!!+php artisan view:clear
+
+...Controllers\Auth\LoginController.php & RegisterController.php
+
+//protected $redirectTo = '/home';
+protected $redirectTo = '/';
+
+...THEN Dashboard (in navbar) — only for admin (!!!BUT THAT IS NOT ALL FOR ACCESS...)
+
+...views\front\navbar.blade.php
+
+                           @admin
+                           <a class="dropdown-item" href="{{ route('dashboard') }}">Dashboard</a> <!-- route(... -->
+                           @endadmin
+
+...Providers\AppServiceProvider.php (from laravel-cards)
+
+use Illuminate\Support\Facades\Blade;
+
+    public function boot()
+    {
+        view()->composer('front/index', UserComposer::class);
+
+        Blade::if('admin', function () {
+            return auth()->user()->role === 'admin';
+        });
+
+    }
+
+!!!php artisan view:clear  
+
+
+--- routes\web.php
+
+/*
+|--------------------------------------------------------------------------
+| Backend
+|--------------------------------------------------------------------------|
+*/
+Route::prefix('')->namespace('Back')->group(function () {
+   
+   //Route::middleware('admin')->group(function () {
+   //Route::middleware('auth')->group(function () { 
+      //Route::name('dashboard')->get('/dashboard', 'AdminController@index')->middleware('admin');
+      Route::name('dashboard')->get('/dashboard', 'AdminController@index');
+      Route::resource('messages', 'AdminController'); 
+   //});
+
+});
+
+
+...Controllers\Back\AdminController.php copy from !here Front\MessageController.php
+
+namespace App\Http\Controllers\Back;
+
+use Illuminate\Http\Request;
+use App\ {
+    Http\Controllers\Controller,  //without «,» for end
+    Repositories\AdminRepository,
+    Http\Controllers\Traits\Indexable
+
+};
+
+class AdminController extends Controller
+{
+    use Indexable;
+
+    /**
+     * Create a new controller instance.
+     *
+     * @return void
+     */
+    public function __construct(AdminRepository $adminrepository)
+    //public function __construct()
+    {
+        $this->repository = $adminrepository;
+        $this->namespace = 'back';
+    }
+
+
+...Repositories\AdminRepository.php — !just here + !!!getData just from FrontRepository
+
+    /**
+     * Create a query for Apimessage.
+     *
+     * @return \Illuminate\Database\Eloquent\Builder
+     */
+    public function getData($request, $parameters)
+    {
+        $query = $this->model
+            ->select('id', 'user_id', 'title', 'message', 'datevisit')
+            ->orderBy($parameters['order'], $parameters['direction']);
+            
+            //if($request->user_id) $query = $query->where('user_id', $request->user_id); 
+
+        return $query->get();
+    }
+
+...BECAUSE    in Indexable.php     return view($this->namespace . '.index', ['namespace' => $this->namespace, 'messages' => $messages]);
+
+config/parameters.php (!just here)
+
+    'back' => [
+        'order' => 'datevisit',
+        'direction' => 'desc',
+    ],
+
+...views\back\layout.blade.php & index.blade.php & brick-standart.blade.php copy from laravel-cards BACK
++public\AdminLTE from laravel-cards
+
+layout.blade.php
+
+                <li class="header bolder" style="color: white;">MENU</li>
+                <li>
+                    <a href="{{ url('/') }}">
+                        <i class="fa fa-folder-o"></i> <span>HOME</span>
+                    </a>
+                </li>
+                <li class="header" style="font-size: 15px;">MESSAGES</li>  
+                <li>
+                    <a href="{{ url('/dashboard') }}">
+                        <i class="fa fa-folder-o"></i> <span>List of Messages</span>
+                    </a>
+                </li>
+
+views\back\index.blade.php
+
+                    @if (session('message-updated'))
+                        @component('back.components.alert')
+                            @slot('type')
+                                success
+                            @endslot
+                            {!! session('message-updated') !!}
+                        @endcomponent
+                    @endif           
+                    ...
+                         <thead>
+                          <tr>
+                            <td class="widthbutton">&nbsp;</td>
+                            <td class="widthbutton">&nbsp;</td>
+                            <td>User Name</td>
+                            <td>Title</td>                            
+                            <td>Message</td>
+                            <td>Date of visit</td>
+                          </tr>  
+                          </thead>
+                          <tbody id="pannel">
+                             @include('back.brick-standard')
+                         </tbody>    
+
+views\back\brick-standart.blade.php
+
+@foreach($messages as $message)
+<tr>
+<td class="center widthbutton"><a class="btn btn-danger listbuttonremove" href="{{ route('messages.destroy', [$message->id]) }}"><i class="fa fa-trash-o" aria-hidden="true"></i></a></td>
+<td class="col-md-6 col-sm-6 col-xs-6 center widthbutton"><a class="btn btn-primary listbuttonupdate" href="{{ route('messages.edit', [$message->id]) }}"><i class="fa fa-edit" aria-hidden="true"></i></a></td>
+   <td>{{ $message->user->name }}</td>
+   <td>{{ $message->title }}</td>  
+   <td>{{ $message->message }}</td>   
+   <td>{{ $message->datevisit }}</td>
+</tr>
+@endforeach
+
+!!!BUT NOW — alex → /dashboard
+
+
+--- COUNT MESSAGES
+
+1.НЕСОВСЕМ ПО MVC
+
+views\back\layout.blade.php
+
+<?php
+use App\Models\Apimessage;
+?>
+
+<!DOCTYPE html>
+<html>
+...
+                <li>
+                    <a href="{{url('/dashboard')}}">
+                        <i class="fa fa-folder-o"></i> <span>List of Messages - {{count(Apimessage::select('id')->get())}}</span>
+                    </a>
+                </li>
+
+1.БОЛЕЕ "ПРОДВИНУТО" - ПО MVC - ViewComposers
+
+app\Http\ViewComposers\ApimessageComposer.php (from !here UserComposer.php)
+
+...
+use App\Models\Apimessage;
+
+    public function compose(View $view)
+    {
+        $view->with('apimessages', Apimessage::select('id')->get());
+    }
+
+app\Providers\AppServiceProvider.php
+
+...
+use App\Http\ViewComposers\ApimessageComposer;
+
+    public function boot()
+    {
+        ...
+        view()->composer('back/layout', ApimessageComposer::class);  
+        ...  
+
+views\back\layout.blade.php
+
+                <li>
+                    <a href="{{url('/dashboard')}}">
+                        <i class="fa fa-folder-o"></i> <span>List of Messages - {{count($apimessages)}}</span>
+                    </a>
+                </li>
+

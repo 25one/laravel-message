@@ -1,0 +1,97 @@
+----- 3-ApimessageRequest&middleware auth-api&js-view result (SOMETIMES BY YOURSELF, WITHOUT START-FILES, COPY-PASTE FROM LAST PROJECT AND CHANGE)
+
+app\Http\Requests\ApimessageRequest.php (FROM laravel-cards JoinedRequest.php AND CHANGE)
+
+    public $validator = null; //if you need validator->errors() for ApimessageRequest $request + see in ApiController
+
+    protected function failedValidation(\Illuminate\Contracts\Validation\Validator $validator) //if you need validator->errors() for ApimessageRequest $request + see in ApiController
+    {
+        $this->validator = $validator;
+    }
+
+    +
+
+            'title' => 'bail|required|max:255',
+            'message' => 'bail|required|max:500',   
+
+
+ApiController.php:
+
+use Validator; //!!!
+
+    //public function store(Request $request)
+    public function store(ApimessageRequest $request)
+    {
+        if(isset($request->validator) && $request->validator->fails()) //if you need validator->errors() for ApimessageRequest $request + see in ApimessageRequest
+        {
+            return $request->validator->errors(); //{"message":["The message field is required."]}
+        } else {
+
+            return $this->repository->store($request); //in mobi-message must be later {"title":"aaa","message":"bbb","datevisit":"2019-12-12","id":1}
+        }  
+    
+    }
+
+
+...mobi-message —> errors of validation
+
+---
+
+Route::name('apimessages')->middleware('auth:api')->resource('apimessages', 'Back\ApiController'); 
+//Route::name('apimessages')->resource('apimessages', 'Back\ApiController'); 
+
+...SHOW laravel form registration
+
+copy(remove old) ...create_users_table.php from laravel-cards
++
+$table->string('api_token')->unique();
+
+copy DatabaseSeeder.php from laravel-cards
++
+'api_token' => str_random(8),
+
+remove all tables from DB
++
+php artisan migrate --seed
+
+see api_token - for example 7SlUFjwS (see in users-table)
+
+mobi-message
+    ...
+    $response = $client->request('POST', 'http://laravel-message/api/apimessages?api_token=7SlUFjwS', [ 
+    ...
+
+And Who has that been? 
+DB laravel-message — remove all
++ changed 2019_02_02_082606_apimessages.php
+($table->integer('user_id')->unsigned()->index();)
+
++2019_02_06_082606_create_foreign_keys.php
+
+php artisan migrate --seed
+
+see new api_token → in mobi_message\Api.php
+
++app\Models\Apimessage.php
+    protected $fillable = [
+         'user_id', 'title', 'message', 'datevisit',
+    ];
+
+    /**
+     * One to One relation
+     *
+     * @return \Illuminate\Database\Eloquent\Relations\belongsTo
+     */
+    public function user()
+    {
+        return $this->belongsTo(User::class);
+    }    
+
++app\Repositories\AdminRepository.php
+return Apimessage::create(array_merge($request->all(), ['user_id' => \Auth::guard('api')->user()->id]));
+
+---    
+
+mobi-message\mine.js
+
+JSON.parse(data) + if(data_json['id']) +  else for(var i in data_json) ... += ...

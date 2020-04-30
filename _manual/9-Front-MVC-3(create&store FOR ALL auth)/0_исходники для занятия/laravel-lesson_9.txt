@@ -1,0 +1,198 @@
+----9-Front-MVC-3(create&store FOR ALL auth + !from FRONT + !admin as all auth-users (NOW - not working link in LTE only for admin (or this link is not here)))
+
+--- CREATE
+
+--- Контроллер ресурсов RESTful
+Verb    Path                        Action  Route Name
+GET     /users/create               create  users.create
+POST    /users                      store   users.store
+
+
+...views\front\navbar.blade.php
+
+                   <li class="nav-item">
+                      <a class="nav-link" href="#">New Message </a>
+                   </li>
+
+                   <!-- Authentication Links -->
+
+...НО СЕЙЧАС ДЛЯ ВСЕХ, ПОЭТОМУ
+
++ @auth
+
++!!!
+routes\web.php
+
+href="{{ route('newmessages.create') }}"
+
+/*
+|--------------------------------------------------------------------------
+| Frontend
+|--------------------------------------------------------------------------|
+*/
+// Home
+Route::prefix('')->namespace('Front')->group(function () {
+
+   Route::name('home')->get('/', 'MessageController@index');
+   Route::resource('newmessages', 'MessageController'); 
+
+});
+
+
+...Controllers\Front\MessageController.php (method create from laravel-cards)
+
+    /**
+     * Show the form for creating a new message.
+     *
+     * @return \Illuminate\Http\Response
+     */
+    public function create()
+    {
+        return view('front.messages.create');
+    }           
+
+...views\front\messages & components from !here .....views\back\messages & components 
++...views\front\messages — ONLY create.blade.php + template.blade.php, and ...views\back\messages — ONLY edit.blade.php + template.blade.php
+
++front\messages\create.blade.php
+
+@extends('front.messages.template')
+
+@section('form-open')
+    <form method="post" action="{{ route('newmessages.store') }}">
+                    {{ csrf_field() }}
+                {{ method_field('POST') }}   
+@endsection
+
++front\messages\template.blade.php
+
+@extends('front.layout')
+…
+            @if (session('message-ok'))
+                @component('front.components.alert')
+                    @slot('type')
+                        success
+                    @endslot
+                    {!! session('message-ok') !!}
+                @endcomponent
+            @endif
+...
+                        <input type="hidden" name="user_id" value="{{auth()->user()->id}}" />
+                        <input type="hidden" name="datevisit" value="{{date('Y-m-d')}}" />
+
+                        <div class="">
+                            <label for="name">@lang('User Name')</label>
+                            <h4>{{auth()->user()->name}}</h4>
+                        </div>
+                        <div class="">
+                            <label for="name">@lang('Date of visit')</label>
+                            <h4>{{date('Y-m-d')}}</h4>
+                        </div>                                   
+                        <div class="form-group {{ $errors->has('title') ? 'has-error' : '' }}">
+                            <label for="name">@lang('Title')</label>
+                            <input type="text" class="form-control" id="title" name="title" value="@if(old('title')){{old('title')}}@endif" placeholder="Title"> 
+                            {!! $errors->first('title', '<small class="help-block">:message</small>') !!}
+                        </div>
+                        <div class="form-group {{ $errors->has('message') ? 'has-error' : '' }}">
+                            <label for="name">@lang('Message')</label>
+                            <input type="text" class="form-control" id="message" name="message" value="@if(old('message')){{old('message')}}@endif" placeholder="Message"> 
+                            {!! $errors->first('message', '<small class="help-block">:message</small>') !!}
+                        </div>       
+
+
+...НО СЕЙЧАС ДАЖЕ НЕЗАЛОГИНЕННЫЙ ПОЛЬЗОВАТЕЛЬ МОЖЕТ ПОПРОБОВАТЬ СДЕЛАТЬ 
+http://127.0.0.1:8080/laravel-message/newmessages/create - НО, ОШИБКА ПО auth()->...
+
+...ПОЭТОМУ
+
+Route::resource('newmessages', 'MessageController')->middleware('auth');
+
+...ИЛИ
+
+    public function __construct(FrontRepository $frontrepository)
+    //public function __construct()
+    {
+        //$this->middleware('auth'); //!!!ТАК НЕ ПОЙДЕТ - НЕ ЗАЙДЕТ ПРОСТО НА front-index - СТАРТ-СТРАНИЦУ
+        $this->middleware('auth')->only('create', 'store');
+        $this->repository = $frontrepository;
+        $this->namespace = 'front';
+    }
+
+
+--- STORE
+
+...Controllers\Front\MessageController.php from laravel-cards
+
+use App\ {
+    Http\Controllers\Controller,  //without «,» for end
+    Repositories\FrontRepository,
+    Http\Requests\MessageRequest,    
+    Http\Controllers\Traits\Indexable
+
+};
+
+    /**
+     * Store a newly created message in storage.
+     *
+     * @param  \App\Http\Requests\MessageRequest $request
+     * @return \Illuminate\Http\Response
+     */
+    public function store(MessageRequest $request)
+    //public function store(Request $request)
+    {
+        $this->repository->store($request);        
+        return redirect(route('newmessages.create'))->with('message-ok', __('The message has been successfully created'));   
+    }               
+
+
+...Repositories\FrontRepository.php from laravel-lessoncards
+
+    /**
+     * Store message.
+     *
+     * @param  \App\Http\Requests\MessageRequest $request
+     * @return void
+     */
+    public function store($request)
+    {
+        $message = Apimessage::create($request->all());
+    }    
+
++ back\layout.blade.php НЕТ
+
+                @admin
+                <li>
+                    <a href="{{ route('messages.create') }}">
+                        <i class="fa fa-folder-o"></i> <span>Add new Message</span>
+                    </a>
+                </li>
+                @endadmin
+
+...admin create a message as all auth-user
+
+--- errors will be red
+
+front\layout.blade.php
+
+<link rel="stylesheet" href="{{ asset('public/AdminLTE/css/AdminLTE.min.css') }}">
+
+...но, тогда меняется внешний вид всего layout (navbar...)
+
+in public\css\AdminLTE.min.css
+
+.form-group.has-error label{color:#dd4b39}
+.form-group.has-error .help-block{color:#dd4b39}
+
+...then front\messages\create.blade.php
+
+@section('css')
+<style>
+.form-group.has-error label{color:#dd4b39}
+.form-group.has-error .help-block{color:#dd4b39}
+</style>
+@endsection
+
+front/components/alert.blade.php
+
+remove <span class="icon fa fa-check">
+

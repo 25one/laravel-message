@@ -1,0 +1,124 @@
+----10-Back-MVC-4(auth-edit-update-destroy + Policy)
+
+...views\front\navbar.blade.php
+
+                           @auth
+                           <a class="dropdown-item" href="{{ route('dashboard') }}">Dashboard</a> <!-- route(... -->
+                           @endauth
+
+...but NOT go to Dashboard
+
+then
+routes\web.php
+
+/*
+|--------------------------------------------------------------------------
+| Backend
+|--------------------------------------------------------------------------|
+*/
+Route::prefix('')->namespace('Back')->group(function () {
+   
+   //Route::middleware('admin')->group(function () {
+   Route::middleware('auth')->group(function () { 
+      //Route::name('dashboard')->get('/dashboard', 'AdminController@index')->middleware('admin');
+      Route::name('dashboard')->get('/dashboard', 'AdminController@index');
+      Route::resource('messages', 'AdminController'); 
+   });
+
+});
+
+...but ALL items
+
+then
+...Repositories\AdminRepository.php
+
+    public function getData($request)
+    {
+        $query = $this->model
+            ->select('id', 'user_id', 'title', 'message', 'datevisit')
+            ->orderBy('user_id', 'asc');
+            //->orderBy($parameters['order'], $parameters['direction']);
+            
+            if($request->user) $query->where('user_id', $request->user); //where('type_id', '=', $request->type) 
+            if(auth()->user()->role != 'admin') $query->where('user_id', auth()->user()->id);
+
+        return $query->get();  
+    }         
+
+
+...NOT IMPORTANT — SEARCH SELECT FOR NOT admin
+
+then
+...views\back\index.blade.php
+
+                      @admin
+                      <div class="row margin">
+                          <div class="col-md-3 col-sm-4 col-xs-12">
+                              <div class="form-group">
+                                  <label for="user" class="size">Select user</label>
+                                  <select class="form-control input-size" style="height: auto;" name="user_id" id="user_id">
+                                      <option value="0" class="input-size" 
+                                         >-----</option> 
+                                      @foreach ($users as $key => $user)
+                                         <option value="{{ $user->id }}" class="input-size" 
+                                         >@lang($user->name)</option>
+                                      @endforeach      
+                                  </select>
+                              </div>
+                          </div>
+                      </div>   
+                      @endadmin
+
+
+...but now http://laravel-message/messages/5/edit (...6/edit, ...7/edit) — item of admin (serg, helen), NOT alex - !!!Policy
+
+
+app\Policies from laravel-cards
+
+app\Policies\MessagePolicy.php
+
+use App\Models\ {User, Apimessage};
+
+class MessagePolicy extends Policy
+{
+    /**
+     * Determine whether the user can manage the comment.
+     *
+     * @param \App\Models\User $user
+     * @param \App\Models\Apimessage $message
+     * @return mixed
+     */
+    public function manage(User $user, Apimessage $message)
+    {
+        return $user->id === $message->user_id;
+    }
+
+
+app\Providers\AuthServiceProvider.php
+
+use App\Models\Apimessage;
+use App\Policies\MessagePolicy;
+…
+    protected $policies = [
+        // 'App\Model' => 'App\Policies\ModelPolicy',
+        Apimessage::class => MessagePolicy::class,
+    ];
+
+
+...Controllers\Back\AdminController.php
+
+    public function edit(Apimessage $message)
+    {
+       $this->authorize('manage', $message);
+…
+
+    public function update(MessageRequest $request, Apimessage $message)
+    //public function update(Request $request, Apimessage $message)
+    {
+        $this->authorize('manage', $message);
+...
+
+    public function destroy(Apimessage $message)
+    {
+        $this->authorize('manage', $message);
+...

@@ -1,0 +1,264 @@
+---- 7-Back-MVC-2(middleware&Search for admin&Getdataable-Trait&resourse-edit)
+
+app\Http\Middleware\Admin.php from laravel-cards
+
++ app\Http\Kernel.php
+    
+protected $'auth' => \App\Http\Middleware\Authenticate::class,
+        'auth.basic' => \Illuminate\Auth\Middleware\AuthenticateWithBasicAuth::class,
+        'bindings' => \Illuminate\Routing\Middleware\SubstituteBindings::class,
+        'cache.headers' => \Illuminate\Http\Middleware\SetCacheHeaders::class,
+        'can' => \Illuminate\Auth\Middleware\Authorize::class,
+        'guest' => \App\Http\Middleware\RedirectIfAuthenticated::class,
+        'signed' => \Illuminate\Routing\Middleware\ValidateSignature::class,
+        'throttle' => \Illuminate\Routing\Middleware\ThrottleRequests::class,
+        'verified' => \Illuminate\Auth\Middleware\EnsureEmailIsVerified::class,
+        'admin' => \App\Http\Middleware\Admin::class,          
+    ];
+
+routes\web.php
+
+1-variant
+
+Route::prefix('')->namespace('Back')->group(function () {
+   
+   Route::middleware('admin')->group(function () {
+   //Route::middleware('auth')->group(function () { 
+      //Route::name('dashboard')->get('/dashboard', 'AdminController@index')->middleware('admin');
+      Route::name('dashboard')->get('/dashboard', 'AdminController@index');
+      Route::resource('messages', 'AdminController'); 
+   });
+
+});
+
+
+2-variant
+
+Route::prefix('')->namespace('Back')->group(function () {
+   
+   //Route::middleware('admin')->group(function () {
+   //Route::middleware('auth')->group(function () { 
+      Route::name('dashboard')->get('/dashboard', 'AdminController@index')->middleware('admin');
+      //Route::name('dashboard')->get('/dashboard', 'AdminController@index');
+      Route::resource('messages', 'AdminController'); 
+   //});
+
+});
+
+3-variant
+
+Route::prefix('')->namespace('Back')->group(function () {
+   
+   //Route::middleware('admin')->group(function () {
+   //Route::middleware('auth')->group(function () { 
+      //Route::name('dashboard')->get('/dashboard', 'AdminController@index')->middleware('admin');
+      Route::name('dashboard')->get('/dashboard', 'AdminController@index');
+      Route::resource('messages', 'AdminController'); 
+   //});
+
+});
+
++ ...Controllers\Back\AdminController.php
+
+    public function __construct(AdminRepository $adminrepository)
+    //public function __construct()
+    {
+        $this->middleware('admin');
+        $this->repository = $adminrepository;
+        $this->namespace = 'back';
+    }
+
+--- SEARCH FOR ADMIN (BACK)
+
+...views\back\index.blade.php from !here ...views\front\index.blade.php
+
+                      <div class="row margin">
+                          <div class="col-md-3 col-sm-4 col-xs-12">
+                              <div class="form-group">
+                                  <label for="user" class="size">Select user</label>
+                                  <select class="form-control input-size" style="height: auto;" name="user_id" id="user_id">
+                                      <option value="0" class="input-size" 
+                                         >-----</option> 
+                                      @foreach ($users as $key => $user)
+                                         <option value="{{ $user->id }}" class="input-size" 
+                                         >@lang($user->name)</option>
+                                      @endforeach      
+                                  </select>
+                              </div>
+                          </div>
+                      </div>   
+
+                      <table>
+
+...error - @foreach ($users as $key => $user)
+
+app\Providers\AppServiceProvider.php
+
+    public function boot()
+    {
+        view()->composer('front/index', UserComposer::class);
+        view()->composer('back/layout', ApimessageComposer::class);         
+        view()->composer('back/index', UserComposer::class);
+
+        Blade::if('admin', function () {
+            return auth()->user()->role === 'admin';
+        });
+        
+    }
+
+...views\back\index.blade.php from !here ...views\front\index.blade.php
+
+@section('js')
+    <script src="{{ asset('public/js/mine.js') }}"></script>
+    <script>
+       $(document).ready(function(){
+          $('#user_id').change(function(){
+             BaseRecord.userSelect($(this).val(), '/dashboard');
+          });        
+          //$('.listbuttonremove').click(function(){
+          //   BaseRecord.destroy($(this).attr('href'));
+          //   return false;
+          //});
+       });
+    </script>
+@endsection    
+
++ AdminRepository.php
+
+    public function getData($request, $parameters)
+    {
+        $query = $this->model
+            ->select('id', 'user_id', 'title', 'message', 'datevisit')
+            ->orderBy($parameters['order'], $parameters['direction']);
+            
+            //!!!
+            if($request->user_id) $query = $query->where('user_id', $request->user_id); 
+
+        return $query->get();
+    }    
+
+--- Getdataable
+
+app\Http\Controllers\Traits\Getdataable
+
+trait Getdataable
+{
+    /**
+     * The Repository instance.
+     *
+     * @var \App\Repositories\MessageRepository
+     * @var \App\Repositories\AdminRepository     
+     */
+    protected $model; //Apimessage
+
+    /**
+     * Get data from messages.
+     *
+     * @param  \App\Models\Apimessage $apimessage      
+     */
+    public function getData($request, $parameters) //$parameters['order'], $parameters['direction']
+    {
+        $query = $this->model
+           ->select('id', 'user_id', 'title', 'message', 'datevisit')
+           ->orderBy($parameters['order'], $parameters['direction']); 
+
+        if($request->type) $query->where('user_id', $request->type);
+
+        return $query->get();   
+    }
+
+MessageRepository.php && AdminRepository.php
+
+...
+use App\Http\Controllers\Traits\Getdataable;
+
+class MessageRepository // && AdminRepository
+{
+    use Getdataable;
+...
+
++ /* public function getData($request, $parameters)...    
+
+---
+
+Контроллер ресурсов RESTful
+Verb    Path                        Action  Route Name
+GET     /users                      index   users.index
+GET     /users/create               create  users.create
+POST    /users                      store   users.store
+GET     /users/{user}               show    users.show
+GET     /users/{user}/edit          edit    users.edit
+PUT     /users/{user}               update  users.update
+PUT     /comments/{comment}         update  comments.update
+DELETE  /users/{user}               destroy users.destroy
+
+Verb    Path                        Action  Route Name
+GET     /users/{user}/edit          edit    users.edit
+PUT     /users/{user}               update  users.update
+
+
+RESTful - EDIT
+
+because routes/web.php
+
+Route::resource('messages', 'AdminController');
+
+and views/back/brick-standard.blade.php
+
+<td class="col-md-6 col-sm-6 col-xs-6 center widthbutton"><a class="btn btn-primary listbuttonupdate" href="{{ route('messages.edit', [$message->id]) }}"><i class="fa fa-edit" aria-hidden="true"></i></a></td>
+
+...Controllers\Back\AdminController.php copy from laravel-card AdminController.php
+
+use App\ {
+    Http\Controllers\Controller,  //without «,» for end
+    Repositories\AdminRepository,
+    Http\Controllers\Traits\Indexable,
+    Models\Apimessage //!!!
+
+};
+
+    /**
+     * Show the form for editing the specified resource.
+     *
+     * @param  \App\Models\Apimessage $message
+     * @return \Illuminate\Http\Response
+     */
+    public function edit(Apimessage $message) //!!!just $message, for example
+    {
+       return view('back.messages.edit', compact('message')); //!!!back.messages... + just $message, for example
+    }    
+
+(...views\back\cards & components from laravel-cards + \cards rename to \messages - that must be here)
+
+...messages\edit.blade.php
+
+@extends('back.messages.template')
+
+@section('form-open')
+    <form method="post" action="{{ route('messages.update', [$message->id]) }}">
+                     {{ csrf_field() }}
+                  {{ method_field('PUT') }}   
+@endsection
+
+...messages\template.blade.php
+
+                    <div class="box-body">
+                        <div class="">
+                            <label for="name">@lang('User Name')</label>
+                            <h4>{{$message->user->name}}</h4>
+                        </div>
+                        <div class="">
+                            <label for="name">@lang('Date of visit')</label>
+                            <h4>{{$message->datevisit}}</h4>
+                        </div>                                              
+                        <div class="form-group {{ $errors->has('title') ? 'has-error' : '' }}">
+                            <label for="name">@lang('Title')</label>
+                            <input type="text" class="form-control" id="title" name="title" value="@if(isset($message)){{$message->title}}@elseif(old('title')){{old('title')}}@endif" placeholder="Title"> 
+                            {!! $errors->first('title', '<small class="help-block">:message</small>') !!}
+                        </div>
+                        <div class="form-group {{ $errors->has('message') ? 'has-error' : '' }}">
+                            <label for="name">@lang('Message')</label>
+                            <input type="text" class="form-control" id="message" name="message" value="@if(isset($message)){{$message->message}}@elseif(old('message')){{old('message')}}@endif" placeholder="Message"> 
+                            {!! $errors->first('message', '<small class="help-block">:message</small>') !!}
+                        </div>                        
+                    </div>

@@ -1,0 +1,290 @@
+---- 5-Front-MVC-2(Trait&Repository&$messages&ajax-select-request)
+
+app\Http\Controllers\Traits\Indexable.php — NEW — JUST COPY - ПОКА БЕЗ РЕПОЗИТОРИЯ
+
+namespace App\Http\Controllers\Traits;
+
+use Illuminate\Http\Request;
+
+trait Indexable
+{
+    /**
+     * The Repository instance.
+     *
+     * @var \App\Repositories\MessageRepository
+     * @var \App\Repositories\AdminRepository     
+     */
+    protected $repository; //MessageRepository or AdminRepository
+
+    /**
+     * The namespace
+     *
+     * @var string
+     */
+    protected $namespace; //front or back
+
+    /**
+     * Display a listing of the records.
+     *
+     * @param  \Illuminate\Http\Request $request
+     * @return \Illuminate\Http\Response
+     */
+    public function index(Request $request)
+    {
+        //MessageController, AdminController
+        //$messages = $this->repository->getData($request, $this->getParameters());
+
+        /*
+        if ($request->ajax()) {
+            return response()->json([
+                'table' => view($this->namespace . ".brick-standard", ['messages' => $messages])->render(),
+            ]);
+        } 
+        */  
+        
+        //front or back
+        //return view($this->namespace . '.index', compact('messages'));
+        return view($this->namespace . '.index');
+    }
+
+    /**
+     * Get parameters.
+     *
+     * @param  ...
+     * @return array
+     */
+    protected function getParameters()
+    {
+        // Default parameters
+        $parameters = config("parameters.".$this->namespace); //$parameters['order'], $parameters['direction']... 
+
+        return $parameters; 
+    }        
+
++MessageController.php
+…
+use App\ {
+    Http\Controllers\Controller,  //without «,» for end
+    //Repositories\FrontRepository,
+    Http\Controllers\Traits\Indexable
+
+};
+
+class MessageController extends Controller
+{
+    use Indexable;
+
+    /**
+     * Create a new controller instance.
+     *
+     * @return void
+     */
+    //public function __construct(FrontRepository $frontrepository)
+    public function __construct()
+    {
+        //$this->repository = $frontrepository;
+        $this->namespace = 'front';
+    }
+...
+
+/*
+public function index(Request $request)
+{...}
+*/
+
+- - VIEW INFORMATION FROM apimessages - ТЕПЕРЬ С РЕПОЗИТОРИЕМ (FrontRepository from CardRepository)
+
+...Front\MessageController.php
+
+use Illuminate\Http\Request;
+use App\ {
+    Http\Controllers\Controller,  //without «,» for end
+    Repositories\FrontRepository, //!!!
+    Http\Controllers\Traits\Indexable
+
+};
+
+class MessageController extends Controller
+{
+    use Indexable;
+
+    /**
+     * Create a new controller instance.
+     *
+     * @return void
+     */
+    public function __construct(FrontRepository $repository) //!!!
+    //public function __construct()
+    {
+        //$this->middleware('auth');
+        $this->repository = $repository; //!!!
+        $this->namespace = 'front';
+    }
+
+    /**
+     * Show the application dashboard.
+     *
+     * @return \Illuminate\Contracts\Support\Renderable
+     */
+    //public function index(Request $request, CardRepository $repository)
+    /*
+    public function index(Request $request)
+    {
+        //$cards = $repository->getData($request);
+        //return view('front.index', compact('cards')); //['cards' => $cards]
+        return view('front.index');
+    }
+    */
+}
+ 
+...Repositories\FrontRepository.php (from laravel-cards Repositories\CardRepository.php)
+
+namespace App\Repositories;
+
+use App\Models\ {
+    Apimessage //!!!
+};
+
+class FrontRepository
+{
+    /**
+     * The Model instance.
+     *
+     * @var \Illuminate\Database\Eloquent\Model
+     */
+    protected $model;
+
+
+    /**
+     * Create a new FrontRepository instance.
+     *
+     * @param  \App\Models\Apimessage $apimessage
+     */
+    public function __construct(Apimessage $apimessage) //!!!
+    {
+        $this->model = $apimessage;
+    }
+
+    /**
+     * Create a query for Apimessage.
+     *
+     * @return \Illuminate\Database\Eloquent\Builder
+     */
+    public function getData($request, $parameters)
+    {
+        $query = $this->model
+            ->select('id', 'user_id', 'title', 'message', 'datevisit')
+            ->orderBy($parameters['order'], $parameters['direction']);
+            
+            if($request->user) $query = $query->where('user_id', $request->user); //where('type_id', '=', $request->type) 
+
+        return $query->get();
+    }
+
+
+config/parameters.php
+
+    'front' => [
+           'order' => 'datevisit',
+           'direction' => 'desc',
+    ],
+
+
+Indexable.php
+
+    public function index(Request $request)
+    {
+        //MessageController, AdminController
+        $messages = $this->repository->getData($request, $this->getParameters()); //!!!
+
+        if ($request->ajax()) {
+            return response()->json([
+                'table' => view($this->namespace . ".brick-standard", ['messages' => $messages])->render(),
+            ]);
+        }   
+        
+        //front or back
+        return view($this->namespace . '.index', compact('messages')); //!!!
+        //return view($this->namespace . '.index');
+    }
+
+...views\front\brick-standard.blade.php
+
+@foreach($messages as $message)
+<article class="brick entry format-standard animate-this margin-top">
+    <div class="entry-text">
+        <div class="entry-header">
+            <h1 class="entry-title"><a href="#">{{ $message->title }}</a> <span class="red">({{ $message->user->name }})</span></h1>
+<h3>{{ $message->datevisit }}</h3>
+        </div>
+        <div class="entry-excerpt">
+            {{ $message->message }}
+        </div>
+    </div>
+</article>
+@endforeach
+
+($message→user→name → ...Models\Apimessage.php → 
+    public function user()
+    {
+        return $this->belongsTo(User::class);
+    }    
+)
+
+front\index.blade.php
+
+    <div id="pannel">
+       @include('front.brick-standard')
+    </div>   
+
+
+--- SEARCH INFORMATION FROM apimessages (!js-ajax)
+
+...front\index.blade.php
+
+@section('js')
+<script src="{{ asset('public/js/mine.js') }}"></script>
+<script>
+   $(document).ready(function(){
+      $('#user_id').change(function(){
+         BaseRecord.typeUser($(this).val());
+      });
+   });
+</script>
+@endsection    
+
+
+public\js\mine.js
+
+typeUser: function(type_id){
+   var ajaxSetting={
+      method: 'get',
+      url: './',
+      data: {
+         type: type_id, //$request->type
+      },
+      success: function(data){
+         //alert(data);
+         $('#pannel').html(data.table);
+      },
+      error: function(data){
+         alert(data.responseText);
+      },
+   };
+   $.ajax(ajaxSetting);
+},
+
+...Traits\Indexable.php (ЭТО ЕСТЬ)
+
+        // Ajax response
+        if ($request->ajax()) {
+            return response()->json([
+                'table' => view($this->namespace . ".brick-standard", ['messages' => $messages])->render(),
+            ]);
+        } 
+
+...Repositories\MessageRepository.php (ЭТО ЕСТЬ)
+
+...
+if($request->type) $query->where('user_id', $request->type); 
+...

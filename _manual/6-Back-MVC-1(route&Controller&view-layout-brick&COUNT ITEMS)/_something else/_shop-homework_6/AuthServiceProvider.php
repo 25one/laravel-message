@@ -1,0 +1,36 @@
+<?php
+
+namespace App\Providers;
+
+use Illuminate\Support\Facades\Gate;
+use Illuminate\Foundation\Support\Providers\AuthServiceProvider as ServiceProvider;
+use App\Models\Cart;
+use App\Policies\CartPolicy;
+use App\Models\Apimessage;
+use App\Policies\ApimessagePolicy;
+
+class AuthServiceProvider extends ServiceProvider
+{
+    /**
+     * The policy mappings for the application.
+     *
+     * @var array
+     */
+    protected $policies = [
+        // 'App\Model' => 'App\Policies\ModelPolicy',
+        Cart::class => CartPolicy::class, 
+        Apimessage::class => ApimessagePolicy::class,             
+    ];
+
+    /**
+     * Register any authentication / authorization services.
+     *
+     * @return void
+     */
+    public function boot()
+    {
+        $this->registerPolicies();
+
+        //
+    }
+}

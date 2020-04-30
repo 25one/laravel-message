@@ -1,0 +1,19 @@
+
+    "require": {
+        "php":">=5.3.0",
+        "guzzlehttp/guzzle": "^6.3"        
+     },
+
+-------------------------------------------------------------------------
+
+    $client = new \GuzzleHttp\Client();  
+    //$response = $client->request('POST', 'http://laravel-message/api/mobimessage?api_token=12345678', [ 
+    $response = $client->request('METHOD', 'http-URL', [ 
+        'form_params' => [
+            'key' => $value, //title, message
+             //...
+             //+datevisit - date('Y-m-d')                
+        ]
+    ]);  
+    //return json_decode($response->getBody()->getContents()); //stdClass Object ...->id(success) or ...->message[0](error of field of message) 
+    return $response->getBody()->getContents();  

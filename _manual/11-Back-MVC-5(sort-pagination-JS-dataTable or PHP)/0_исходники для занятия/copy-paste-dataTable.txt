@@ -1,0 +1,77 @@
+
+<!-- dataTables-css -->
+<link rel="stylesheet" type="text/css" href="{{ asset('public/datatables/datatables.min.css') }}">
+
+<!-- dataTables-js -->
+<script src="{{ asset('public/datatables/datatables.min.js') }}"></script>       
+
+-----------------------------------------------------
+
+startview: function(){
+   var ajaxSetting={
+      method:"post",
+      url:"?page=start",
+      data: 'hook=SelectUsers',
+      success:function(data) {
+        //alert(data);
+        var data_json=JSON.parse(data);
+        var dataSet=[];
+        for(var i in data_json) {
+           var ds=[];
+           for(j in data_json[i]) {
+              if(j!='id' && j!='image') {
+                 ds.push(data_json[i][j]);
+              }
+              if(j=='image') {
+                 ds.unshift('<img src="'+data_json[i][j]+'" alt />');
+              }
+              if(j=='id') ds.unshift('<a class="btn btn-danger listbuttonremove" id="" href="?page=start&hook=RemoveUser/'+data_json[i][j]+'"><i class="fa fa-trash-o" aria-hidden="true"></i></a>');
+              if(j=='id') ds.unshift('<a class="btn btn-primary listbuttonupdate" id="" href="?page=add&hook=UpdateUserView/'+data_json[i][j]+'"><i class="fa fa-edit" aria-hidden="true"></i></a>');                                              
+           }
+           dataSet.push(ds);
+        }
+
+        $('.table-wrapper').DataTable({
+          data: dataSet,
+          "order": [[3, 'asc']],
+          "columnDefs": [
+            { "width": "1%", "targets": [0,1,2] },
+            { "orderable": false, "targets": [0,1,2] },
+          ],
+          columns: [
+              { title: "" },  
+              { title: "" },                       
+              { title: "Photo" },
+              { title: "Name" },
+              { title: "Address" },
+              { title: "Email" },
+              { title: "Phone" },
+           ],
+        });
+
+
+
+      },
+   };
+   $.ajax(ajaxSetting);
+},
+
+-----------------------------------------------------
+
+                            <td>
+                               <table>
+                                 <tr>
+                                   <td rowspan="2">Date of visit</td>
+                                   <td ><a href="#" class="sort" data-order="datevisit" data-direction="asc">
+                                      <img src="{{ asset('public/images/top.jpg') }}" alt />
+                                   </a></td>
+                                 </tr>
+                                 <tr>   
+                                   <td><a href="#" class="sort" data-order="datevisit" data-direction="desc">
+                                      <img src="{{ asset('public/images/bottom.jpg') }}" alt />
+                                   </a></td>  
+                                 </tr>
+                               </table>                    
+                            </td>
+
+

@@ -1,0 +1,265 @@
+----8-Back-MVC-3(update&js-ajax-remove)
+
+--- UPDATE
+
+--- Контроллер ресурсов RESTful
+Verb    Path                        Action  Route Name
+GET     /users                      index   users.index
+GET     /users/create               create  users.create
+POST    /users                      store   users.store
+GET     /users/{user}               show    users.show
+GET     /users/{user}/edit          edit    users.edit
+PUT     /users/{user}               update  users.update
+PUT     /comments/{comment}         update  comments.update
+DELETE  /users/{user}               destroy users.destroy
+
+Verb    Path                        Action  Route Name
+GET     /users/{user}/edit          edit    users.edit
+PUT     /users/{user}               update  users.update
+
+@extends('back.messages.template')
+
+@section('form-open')
+    <form method="post" action="{{ route('messages.update', [$message->id]) }}">
+                     {{ csrf_field() }}
+                  {{ method_field('PUT') }}   
+@endsection
+
+...Controllers\Back\AdminController.php from laravel-cards
+
+    /**
+     * Update the specified resource in storage.
+     *
+     * @param  \App\Http\Requests\ApimessageRequest $request
+     * @param  \App\Models\Apimessage $message
+     * @return \Illuminate\Http\Response
+     */
+    //public function update(ApimessageRequest $request, Apimessage $message)
+    public function update(Request $request, Apimessage $message)
+    {
+        //$this->authorize('manage', $card);
+
+        $this->repository->update($request, $message);
+
+        return redirect(route('dashboard'))->with('message-updated', __('The message has been successfully updated'));
+     } 
+
+
+...Repositories\AdminRepository.php from laravel-lessoncards
+
+    /**
+     * Update message.
+     *
+     * @param  \App\Models\Apimessage $message
+     * @return void
+     */
+    public function update($request, $message)
+    {
+       //$message->update($request->all()); 
+       //$message->user_id = $request->user_id;
+       $message->title = $request->title;
+       $message->message = $request->message;
+       //$message->datevisit = $request->datevisit;  
+       $message->save();    
+    }        
+
+!!!//$message->user_id = $request->user_id; //$message->datevisit = $request->datevisit; НЕ ИСПОЛЬЗУЕМ, Т.К. СТАВИТЬ ТУТ ПОЛЯ hidden NOT GOOD - ЕСТЬ ВОЗМОЖНОСТЬ У Admin ИЗМЕНИТЬ user_id, datevisit(НА КЛИЕНТЕ), ЧЕГО БЫТЬ НЕ ДОЛЖНО
+<input type="hidden" name="user_id" value="{{$message->user_id}}" />
+<input type="hidden" name="datevisit" value="{{$message->datevisit}}" />
+
+
+...views\back\index.blade.php
+
+                      @if (session('message-updated'))
+                          @component('back.components.alert')
+                              @slot('type')
+                                  success
+                              @endslot
+                              {!! session('message-updated') !!}
+                          @endcomponent
+                      @endif
+
+...Requests\ApimessageRequest.php to ...Requests\MessageRequest.php - !here
+
++ ...Requests\MessageRequest.php
+
+namespace App\Http\Requests;
+
+class MessageRequest extends Request
+{
+
+    /**
+     * Get the validation rules that apply to the request.
+     *
+     * @return array
+     */
+    public function rules()
+    {
+        return $rules = [
+            'title' => 'bail|required|max:255',
+            'message' => 'bail|required|max:500',   
+        ];
+    }
+
++ ...Controllers\Back\AdminController.php
+
+use App\ {
+    Http\Controllers\Controller,  //without «,» for end
+    Repositories\AdminRepository,
+    Http\Requests\MessageRequest,    
+    Http\Controllers\Traits\Indexable,
+    Models\Apimessage
+
+};
+
++ here
+
+    public function update(MessageRequest $request, Apimessage $message)
+    //public function update(Request $request, Apimessage $message)
+…
+
+
+--- DESTROY
+
+Verb    Path                        Action  Route Name
+DELETE  /users/{user}               destroy users.destroy
+
+...views\back\brick-standart.blade.php
+
+<td class="center widthbutton"><a class="btn btn-danger listbuttonremove" id="{{$message->id}}" href="#"><i class="fa fa-trash-o" aria-hidden="true"></i></a></td>
+
+...views\back\index.blade.php - !here
+
+@section('js')
+    <script src="{{ asset('public/js/mine.js') }}"></script>
+    <script>
+       $(document).ready(function(){
+          $('.listbuttonremove').click(function(){
+             BaseRecord.destroy($(this).attr('id'));
+             return false;
+          });
+          $('#user_id').change(function(){
+             BaseRecord.userSelect($(this).val(), './dashboard');
+          });      
+       });
+    </script>
+@endsection    
+
+
+public\js\mine.js
+
+destroy: function(user_id){
+   var ajaxSetting={
+      method: 'delete',
+      url: './messages/'+user_id, 
+      success: function(data){
+         alert(data);
+
+      },
+      error: function(data){
+         alert(data.responseText);
+      },
+   };
+   $.ajax(ajaxSetting);
+},
+
+
+AdminController.php
+
+    /**
+     * Remove the card from storage.
+     *
+     * @param  \App\Models\Apimessage $message
+     * @return \Illuminate\Http\Response
+     */
+    public function destroy(Apimessage $message){
+       //$this->authorize('manage', $card); 
+       
+       $message->delete();
+    }      
+
+--- ajax-ОБНОВЛЕНИЕ СТРАНИЦЫ
+
+destroy: function(user_id){
+   var ajaxSetting={
+      method: 'delete',
+      url: './messages/'+user_id, 
+      success: function(data){
+         //alert(data);
+         BaseRecord.userSelect(0, './dashboard');
+      },
+      error: function(data){
+         alert(data.responseText);
+      },
+   };
+   $.ajax(ajaxSetting);
+},
+
++
+
+userSelect: function(user_id, url){
+   var ajaxSetting={
+      method: 'get',
+      //url: './', //./dashboard
+      url: url,
+      data: {
+         type: user_id, //$request->type
+      },
+      success: function(data){
+          //alert(data);
+          $('#pannel').html(data.table);
+          $('.listbuttonremove').click(function(){   //!!!ПЕРЕВЕС СОБЫТИЯ УДАЛЕНИЯ
+             BaseRecord.destroy($(this).attr('id'));
+             return false;
+          });         
+      },
+      error: function(data){
+         alert(data.responseText);
+      },
+   };
+   $.ajax(ajaxSetting);
+},
+
+--- ИЛИ - БЕЗ ВТОРОГО ajax - БОЛЛЕЕ ПРОДВИНУТО
+
+AdminController.php
+
+    public function destroy(Request $request, Apimessage $message) //!!!RESTful ->find($id)
+    {
+       //$this->authorize('manage', $card);
+
+       $message->delete(); 
+
+       return $this->index($request); //!!!ИЗ trait-Indexable
+    }        
+
+...ТОГДА В mine.js МОЖНО ПРОСТО
+
+destroy: function(user_id){
+   var ajaxSetting={
+      method: 'delete',
+      url: './messages/'+user_id, 
+      success: function(data){
+          //alert(data);
+          //BaseRecord.userSelect(0, './dashboard');
+          $('#pannel').html(data.table);
+          $('.listbuttonremove').click(function(){
+             BaseRecord.destroy($(this).attr('id'));
+             return false;
+          });                  
+      },
+      error: function(data){
+         alert(data.responseText);
+      },
+   };
+   $.ajax(ajaxSetting);
+},
+
+!!!НО 
+
+          $('.listbuttonremove').click(function(){
+             BaseRecord.destroy($(this).attr('id'));
+             return false;
+          });       
+
+НУЖНО ОСТАВИТЬ В userSelect, ИНАЧЕ ПОСЛЕ ВЫБОРА - НЕТ destroy          

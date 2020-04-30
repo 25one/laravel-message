@@ -1,0 +1,4 @@
+[2020-03-28 11:02:55] local.ERROR: Class 'App\Hppt\Controllers\Controller' not found {"exception":"[object] (Symfony\\Component\\Debug\\Exception\\FatalErrorException(code: 1): Class 'App\\Hppt\\Controllers\\Controller' not found at /var/www/html/laravel-shop/app/Http/Controllers/Front/ShopController.php:16)
+[stacktrace]
+#0 {main}
+"} 

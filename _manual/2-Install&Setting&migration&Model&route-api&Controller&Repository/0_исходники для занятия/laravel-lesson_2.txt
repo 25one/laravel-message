@@ -1,0 +1,278 @@
+---------------------------------------------------------------------
+NEW PROJECT laravel-message
+
+Virtual host laravel-message
+
+sudo –i
+
+sudo nano /etc/apache2/sites-available/laravel-message.conf
+<VirtualHost *:80>
+        ServerName laravel-message
+        ServerAdmin webmaster@localhost
+        DocumentRoot /var/www/html/laravel-message
+
+        <Directory /var/www/html/laravel-message>
+         Options Indexes FollowSymlinks
+         AllowOverride All
+         Require all granted
+        </Directory> 
+</VirtualHost>
+
+sudo ln -s /etc/apache2/sites-available/laravel-message.conf /etc/apache2/sites-enabled/laravel-message.conf
+
+cd /
+cd etc
+
+sudo nano hosts
+127.0.0.1   localhost
+127.0.0.1   test
+127.0.0.1   products
+127.0.0.1   laravel-products
+127.0.0.1   laravel-shop
+127.0.0.1   laravel-cards
+127.0.0.1   mobi-message
+127.0.0.1   lar-message
+127.0.0.1   lar-shop
+127.0.0.1   mobi-shop
+127.0.0.1   laravel-message
+
+sudo service apache2 restart -> !!!no errors
+
+--------------------------------------------------------------------------------------
+
+Install&Setting of laravel
+
+Must be VIRTUAL HOST laravel-message and DB laravel-message (!create DB).
+
+In Terminal
+
+su vagrant
+cd /
+cd var/www/html
+
+sudo /bin/dd if=/dev/zero of=/var/swap.1 bs=1M count=1024
+sudo /sbin/mkswap /var/swap.1
+sudo /sbin/swapon /var/swap.1
+
+composer create-project --prefer-dist laravel/laravel laravel-message "5.8.*"
+
+cd laravel-message
+
+sudo chmod -R 777 storage
+sudo chmod -R 777 bootstrap/cache
+php artisan config:cache (and if you changed config parameters)
+php artisan cache:clear
+php artisan view:clear (and if you changed views)
+
+Rename .env.example in .env and .env 
+DB_CONNECTION=mysql
+DB_HOST=127.0.0.1
+DB_PORT=3306
+DB_DATABASE=laravel-message
+DB_USERNAME=root
+DB_PASSWORD=password
+
+php artisan key:generate 
+php artisan config:cache
+
+Without PUBLIC in URLc
+Rename server.php in your Laravel root folder to index.php 
+Rename the .htaccess file from /public directory to your Laravel root folder. 
+
+Test (without auth)
+http://laravel-message/ (for Vagrant 127.0.0.1:8080/laravel-message/)
+
+(if error "...encryption key..."
+php artisan key:generate 
+php artisan config:cache)
+
+php artisan make:auth 
+(views/auth (layouts, home.blade.php) + HomeController.php + web.php(routing) (LoginController.php, RegisterController.php... - и так были))
+
+Edit config/database.php
+...
+            //'charset' => 'utf8mb4',
+            //'collation' => 'utf8mb4_unicode_ci',
+            'charset' => 'utf8',
+            'collation' => 'utf8_unicode_ci',   
+... 
+
+'strict' => false,
+'engine' => 'InnoDB',
+
+php artisan config:cache
+
+database\migrations\2014_10_12_000000_create_users_table.php
+...
+$table->bigIncrements('id'); -> $table->increments('id');
+...
+
+php artisan migrate
+
+Test (with auth)
+http://laravel-message/
+
+---------------------------------------------------------------------------------------
+
+--- migrations&Model&route-api&Controller&Repository (SOMETIMES BY YOURSELF, WITHOUT START-FILES, COPY-PASTE FROM LAST PROJECT AND CHANGE)
+
+database\migrations\2019_02_02_082606_apimessages.php
+
+            $table->increments('id');
+            $table->string('title');
+            $table->string('message');
+            $table->date('datevisit')->nullable();  
+
+php artisan migrate
+
+---
+
+Create app\Models + rename Model.php there
+
+User.php - namespace App\Models; 
+
+config/auth.php 
+
+   'providers' => [
+        'users' => [
+            'driver' => 'eloquent',
+            'model' => App\Models\User::class,
+        ],
+
+app\Http\Controllers\Auth\RegisterController.php
+
+use App\Models\User;
+
+composer dump-autoload
+php artisan config:cache
+sudo chmod -R 777 storage
+
+---
++ app\Models\Apimessage.php
+
+    public $timestamps = false;
+
+    /**
+     * The attributes that are mass assignable.
+     *
+     * @var array
+     */
+
+    protected $fillable = [
+         'title', 'message', 'datevisit',
+    ];
+
+---
+
+routes/api.php
+
+//Route::name('apimessages')->middleware('auth:api')->resource('apimessages', 'Back\ApiController'); 
+
+Route::name('apimessages')->resource('apimessages', 'Back\ApiController'); 
+
+---
+
+app\Http\Controllers\Back\ApiController.php (FROM laravel-cards AdminController.php AND CHANGE)
+(
+Контроллер ресурсов RESTful
+Verb    Path                        Action  Route Name
+GET     /cards                      index   cards.index
+GET     /cards/create               create  cards.create
+POST    /cards                      store   cards.store
+GET     /cards/{card}               show    cards.show
+GET     /cards/{card}/edit          edit    cards.edit
+PUT     /cards/{card}               update  cards.update
+PUT     /comments/{comment}         update  comments.update
+DELETE  /cards/{card}               destroy cards.destroy
+Verb — метод выполнения
+Action — имя метода в котроллере
+Route Name — роут во вью
+)
+
+namespace App\Http\Controllers\Back;
+
+use Illuminate\Http\Request;
+use App\ {
+   Http\Controllers\Controller,
+   Repositories\AdminRepository
+   //Http\Requests\ApiRequest
+
+};
+
+class ApiController extends Controller
+{
+
+    protected $repository;
+
+    /**
+     * Create a new controller instance.
+     *
+     * @return void
+     */
+    public function __construct(AdminRepository $repository)
+    {
+        //$this->middleware('auth');
+        $this->repository = $repository;
+    }
+
+    /**
+     * Store a newly created auto in storage.
+     *
+     * @param  \App\Http\Requests\ApiRequest $request
+     * @return \Illuminate\Http\Response
+     */
+    public function store(Request $request)
+    {
+       return $this->repository->storeapimessages($request); 
+       //return redirect(route('dashboard'))->with('auto-ok', 'New auto has been successlully created...');
+    }    
+
+}
+
+app\Repositories\AdminRepository.php (FROM laravel-cards AdminRepository.php AND CHANGE)
+
+amespace App\Repositories;
+
+use App\Models\ {
+    Apimessage
+};
+
+class AdminRepository
+{
+    /**
+     * The Model instance.
+     *
+     * @var \Illuminate\Database\Eloquent\Model
+     */
+    protected $model;
+
+
+    /**
+     * Create a new AdminRepository instance
+     *
+     * @param  \App\Models\Apimessage $apimessage
+     */
+    public function __construct(Apimessage $apimessage) 
+    {
+        $this->model = $apimessage;
+    }
+
+    /**
+     * Store a newly created apimessage in storage.
+     *
+     * @param  \App\Http\Requests\ApiRequest $request
+     * @return \Illuminate\Http\Response
+     */
+    public function storeapimessages($request)
+    {
+       return Apimessage::create($request->all());
+    } 
+
+}
+
+---
+mobi-message\Api.php
+
+...
+$response = $client->request('POST', 'http://laravel-message/api/apimessages', [  //!!!POST - only store
+...

@@ -1,0 +1,4 @@
+[2020-03-06 09:18:12] local.ERROR: Cannot declare class Products, because the name is already in use {"exception":"[object] (Symfony\\Component\\Debug\\Exception\\FatalErrorException(code: 64): Cannot declare class Products, because the name is already in use at /var/www/html/laravel-shop/database/migrations/2019_02_03_082606_carts.php:35)
+[stacktrace]
+#0 {main}
+"} 

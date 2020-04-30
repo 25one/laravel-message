@@ -1,0 +1,306 @@
+----11-Back-MVC-5(sort-pagination-JS-dataTable or PHP)
+
+--- dataTable
+
+...views\back\index.blade.php
+
+@section('css')
+<link rel="stylesheet" type="text/css" href="{{ asset('public/datatables/datatables.min.css') }}">
+...
+@endsection
+
+...
+<table class="table-wrapper">
+...
+
+@section('js')
+<script src="{{ asset('public/datatables/datatables.min.js') }}"></script>
+<script src="{{ asset('public/js/mine.js') }}"></script>
+<script>
+   var messages = '<?php echo json_encode($messages); ?>';
+   $(document).ready(function(){
+      BaseRecord.datatable();
+      ...
+
+
+public/js/mine.js
+
+var BaseRecord=(function() {
+
+return {
+
+datatable: function(){
+        var data_json=JSON.parse(messages);
+        var dataSet=[];
+        for(var i in data_json) {
+           var ds=[];
+           for(j in data_json[i]) {
+              if(j!='id') {
+                 ds.push(data_json[i][j]);
+              }
+              if(j=='id') ds.unshift('<a class="btn btn-danger listbuttonremove" id="" href="'+data_json[i][j]+'"><i class="fa fa-trash-o" aria-hidden="true"></i></a>');
+              if(j=='id') ds.unshift('<a class="btn btn-primary listbuttonupdate" id="" href="'+data_json[i][j]+'"><i class="fa fa-edit" aria-hidden="true"></i></a>');                                              
+           }
+           dataSet.push(ds);
+        }
+
+        $('.table-wrapper').DataTable({
+          data: dataSet,
+          "order": [[2, 'asc']],
+          "columnDefs": [
+            { "width": "1%", "targets": [0,1] },
+            { "orderable": false, "targets": [0,1,3,4] },
+          ],
+          columns: [
+              { title: "" },  
+              { title: "" },                       
+              { title: "Name User" },
+              { title: "Title" },
+              { title: "Message" },
+              { title: "Date of visit" },
+           ],
+        });
+},
+
+
+--- PARAMETERS-SORT
+
+in config\parameters.php ЕСТЬ  
+
+    'front' => [
+        'order' => 'datevisit',
+        'direction' => 'desc',
+    ],
+
+    'back' => [
+        'order' => 'datevisit', 
+        'direction' => 'desc',
+    ],
+
+
+...views\back\index.blade.php
+
+                            <td>
+                               <table>
+                                 <tr>
+                                   <td rowspan="2">Date of visit</td>
+                                   <td ><a href="#" class="sort" data-order="datevisit" data-direction="asc"> <!-- like config\parameters.php -->
+                                      <img src="{{ asset('public/images/top.jpg') }}" alt />
+                                   </a></td>
+                                 </tr>
+                                 <tr>   
+                                   <td><a href="#" class="sort" data-order="datevisit" data-direction="desc"> <!-- like config\parameters.php -->
+                                      <img src="{{ asset('public/images/bottom.jpg') }}" alt />
+                                   </a></td>  
+                                 </tr>
+                               </table>                    
+                            </td>
+
++ public/images/bottom.jpg (top.jpg)
+
++ АНАЛОГИЧНО ДЛЯ <td> User Name, НО data-order="user_id"
+
++
+   $(document).ready(function(){
+      //BaseRecord.datatable();
+      $('.sort').click(function(){
+         BaseRecord.order=$(this).attr('data-order');
+         BaseRecord.direction=$(this).attr('data-direction');
+         BaseRecord.userSelect(0, './dashboard');
+         return false;
+      });    
+
+...public/js/mine.js
+
+order: 'datevisit',
+direction: 'desc',
+
+userSelect: function(user_id, url){
+   var ajaxSetting={
+      method: 'get',
+      //url: './', //./dashboard
+      url: url,
+      data: {
+         type: user_id, //$request->type
+         order: BaseRecord.order, //like config\parameters.php
+         direction: BaseRecord.direction, //like config\parameters.php         
+      },
+      ...
+
+...Traits\Indexable.php
+
+    public function index(Request $request)
+    {
+        //MessageController, AdminController
+        $messages = $this->repository->getData($request, $this->getParameters($request)); //$request (->order, ->direction)
+        ...
+
+    protected function getParameters($request)
+    {
+        // Default parameters
+        $parameters = config("parameters.".$this->namespace); //$parameters['order'], $parameters['direction'] 
+
+        foreach($parameters as $key => &$value){ //$key - 'order' => 'datevisit', 'direction' => 'desc'
+           if($request->$key){ //$request->order, $request->direction
+              $value = $request->$key; //'order' => 'datevisit' !!!or 'user_id'
+           }                           //'direction' => 'desc' !!!or 'asc'
+        }
+
+        return $parameters; 
+    }        
+
+
+--- PAGINATION (!!!FOR FRONT && BACK)
+
+views\front\paginate.blade.php (just copy)  //!!!front
+views\back\paginate.blade.php (just copy)   //!!!back
+
+
+config\app.php
+
+    'nbrPages' => [
+        'front' => [
+            //'products' => 5,
+            'messages' => 5,   //!!!front  
+        ],
+        'back' => [
+            //'products' => 5,
+            'messages' => 5,   //!!!back 
+        ],
+    ],
+
++ php artisan config:cache
+
+
+Controllers\Front\MessageController.php
+
+    public function __construct(MessageRepository $repository)
+    {
+        ...
+        $this->nbrPages = config('app.nbrPages.front.messages'); //!!!front
+    }
+
+Controllers\Back\AdminController.php
+
+    public function __construct(AdminRepository $adminrepository)
+    {
+        ...
+        $this->nbrPages = config('app.nbrPages.back.messages'); //!!!back         
+    }
+
+
+Traits\Indexable.php
+
+    ...
+    /**
+     * The pagination number.
+     *
+     * @var int
+     */
+    protected $nbrPages;
+    ...
+
+    public function index(Request $request)
+    {
+        //MessageController, AdminController
+        $messages = $this->repository->getData($request, $this->getParameters($request), $this->nbrPages); //!!!+$this->nbrPages
+        $links = $messages->appends($this->getParameters($request))->links($this->namespace . '.pagination'); //!!!$this->getParameters($request) - СОХРАНЕНИЕ ПАРАМЕТРОВ СОРТИРОВКИ ПРИ ПАГИНАЦИИ
+
+        // Ajax response
+        if ($request->ajax()) {
+            return response()->json([
+                'table' => view($this->namespace . ".brick-standard", ['messages' => $messages])->render(),
+                'pagination' => $links->toHtml(), //!!!ajax-ДОПОЛНЕНИЕ (СМ.В js)
+            ]);
+        } 
+
+        return view($this->namespace . '.index', compact('messages', 'links')); //!!!links
+    }    
+
+
+Traits\Getdataable.php (AdminRepository.php)
+
+    public function getData($query, $parameters, $nbrPages)
+    {
+       ...
+       //return $query->get();
+       return $query->paginate($nbrPages); //!!!not get - paginate
+
+
+views\front\index.blade.php
+
+...
+<div id="pagination" class="box-footer">
+   {{ $links }}
+</div> 
+
+@endsection
+
+
+views\back\index.blade.php
+
+                     ...
+                     </div> <!-- div class="table-responsive" -->
+                     <hr> <!-- messages->links() -->
+                     <div id="pagination" class="box-footer">
+                       {{ $links }}
+                     </div>          
+                     ...
+
+public\js\mine.js 
+
+      success: function(data) {
+         //alert(data.table);
+         $("#pannel").html(data.table);
+         $('#pagination').html(data.pagination); //!!!     
+         $('.listbuttonremove').click(function () {
+         ...
+
+--- НО ПОКА В ПАГИНАЦИИ НЕ УЧАСТВУЕТ select-change - ПРОСТО ВСЕ, Т.К. ЕГО НЕТ В parameters
+
+config\parameters.php
+
+return [
+
+    'front' => [
+        'changeduser' => 0,     //!!!front    
+        'order' => 'datevisit',
+        'direction' => 'desc',
+    ],
+
+    'back' => [
+        'changeduser' => 0,     //!!!back      
+        'order' => 'datevisit', 
+        'direction' => 'desc',
+    ],
+
+];
+
++ !!!php artisan config:cache
+
+
+public\mine.js
+
+order: 'datevisit',
+direction: 'desc',
+changeduser: 0,     //!!!default
+
+userSelect: function(user_id, url){
+   var ajaxSetting={
+      method: 'get',
+      //url: './', //./dashboard
+      url: url,
+      data: {
+         //type: user_id, //$request->type
+         changeduser: user_id,  //!!!
+         order: BaseRecord.order, //like config\parameters.php
+         direction: BaseRecord.direction, //like config\parameters.php         
+      },
+      ...
+
+
+Traits\Getdataable.php    
+
+        //if($request->type) $query->where('user_id', $request->type);
+        if($parameters['changeduser']) $query->where('user_id', $parameters['changeduser']);
+

@@ -1,0 +1,108 @@
+----12-Console commands&Transactions
+
+--- Console commands
+
+---Task-1 АДМИНИСТРАТОР В КОНЦЕ ДНЯ "ЧИСТИТ" БД СООБЩЕНИЙ - УДАЛЯЕТ СООБЩЕНИЯ, СОДЕРЖАЩИЕ ОПРЕДЕЛЕННЫЕ СЛОВА
+
+СОЗДАТЬ КОМАНДУ (ПО УМОЛЧАНИЮ В app\Console\Commands)
+
+php artisan make:command WordMessage
+
+app\Console\Commands\WordMessage.php
+
+...
+use App\Models\Apimessage; //КАКУЮ МОДЕЛЬ БУДЕМ ИСПОЛЬЗОВАТЬ - НИЖЕ
+
+class WordMessage extends Command
+...
+protected $signature = 'word'; //!!!ИМЯ КОМАНДЫ ПРИ ВЫЗОВЕ
+...
+protected $description = 'delete messages using selected word'; //НЕ ТАК ВАЖНО
+...
+    public function handle()
+    {
+        //1.Eloquent
+        $messages = Apimessage::select('id')->where('message', 'like', '%' . 'war' . '%')->get();
+        //$messages->delete(); //not right
+        foreach($messages as $message){
+           $message->delete();
+        }
+    }
+
+php artisan word
+
+...ИЛИ
+
+        //1.Eloquent
+        /*
+        $messages = Apimessage::select('id')->where('message', 'like', '%' . 'war' . '%')->get();
+        //$messages->delete(); //not right
+        foreach($messages as $message){
+           $message->delete();
+        }
+        */
+        Apimessage::select('id')->where('message', 'like', '%' . 'war' . '%')->delete();
+
+php artisan word    
+
+...
+use DB;
+
+        //2.DB
+        DB::delete('delete from apimessages where message like concat("%", "war", "%")');
+
+
+--- РАЗНЫЕ ЗАДАННЫЕ СЛОВА - ПАРАМЕТРЫ-АРГУМЕНТЫ
+
+protected $signature = 'word {what}';
+...
+        $what = $this->argument('what'); 
+        Apimessage::select('id')->where('message', 'like', '%' . $what . '%')->delete(); 
+...
+
+php artisan word war
+
+
+---Task-2 СООБЩЕНИЯ ДОЛЖНЫ НЕ ТОЛЬКО УДАЛЯТЬСЯ В apimessages, А ПЕРЕНОСИТСЯ В НЕКУЮ messagesarchives
+
+
+database\migrations\2019_02_02_082606_messagesarchives.php - ТОЧНО ТАКОЙ ЖЕ СТРУКТУРЫ, КАК И apimessages
+
+
+app\Console\Commands\WordMessage.php
+
+        //3.Insert && Delete
+        $what = $this->argument('what');
+        DB::insert('insert into messagesarchives select * from apimessages where message like concat("%", ?, "%")', [$what]);
+        DB::delete('delete from apimessages where message like concat("%", ?, "%")', [$what]);
+
+
+---Task-3 Transactions
+
+ЕСЛИ ДОПУСТИТЬ ОШИБКУ, НАПРИМЕР, ВО ВТОРОМ ЗАПРОСЕ - from apimessage - НЕПРАВИЛЬНОЕ ЯМЯ ТАБЛИЦЫ
+
+            DB::insert('insert into messagesarchives select * from apimessages where message like concat("%", ?, "%")', [$what]);
+            DB::delete('delete from apimessage where message like concat("%", ?, "%")', [$what]); 
+
+...ТО insert ВЫПОЛНИТСЯ, А delete - НЕТ - НАРУШЕНИЕ ЦЕЛОСТНОСТИ БД (ОСОБЕННО ПРИ ПЕРЕВОДАХ ДЕНЕЖНЫХ СРЕДСТВ С КАРТЫ НА КАРТУ)
+
+...А ЕСЛИ
+
+        //3.Insert && Delete
+        $what = $this->argument('what');
+        DB::transaction(function() use ($what) {
+            DB::insert('insert into messagesarchives select * from apimessages where message like concat("%", ?, "%")', [$what]);
+            DB::delete('delete from apimessage where message like concat("%", ?, "%")', [$what]);
+        }, 5);
+
+...ОШИБКА ОСТАЛАСЬ - from apimessage - НЕ ВЫПОЛНИТСЯ НИ ОДИН ЗАПРОС - ТОЛЬКО "В ПАРЕ"
+
+        //3.Insert && Delete
+        $what = $this->argument('what');
+        DB::transaction(function() use ($what) {
+            DB::insert('insert into messagesarchives select * from apimessages where message like concat("%", ?, "%")', [$what]);
+            DB::delete('delete from apimessages where message like concat("%", ?, "%")', [$what]);
+        }, 5);
+
+...ВЫПОЛНЯТЬСЯ ОБА, НО ТОЛЬКО ОБА ВМЕСТЕ...
+
